@@ -10,6 +10,7 @@ It is designed as a subtitle-only player:
 - It highlights each annotated word when its token timestamp is active.
 - It supports 2 or 3 subtitle lines automatically, depending on the JSON content.
 - It includes play/pause, timeline scrubbing, restart, and subtitle offset adjustment.
+- It supports playback speed presets (`0.8x`, `0.5x`) and a custom playback speed.
 
 ## Requirements
 
