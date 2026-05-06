@@ -16,6 +16,7 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JSlider;
+import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
@@ -47,9 +48,11 @@ public final class SubtitleViewerApp {
     private final JLabel currentTimeLabel = new JLabel("00:00.00");
     private final JLabel activeSentenceLabel = new JLabel("No active subtitle");
     private final JLabel offsetLabel = new JLabel("Offset: 0 ms");
+    private final JLabel speedLabel = new JLabel("Speed: 1.00x");
     private final JButton playPauseButton = new JButton("Play");
     private final JSlider timelineSlider = new JSlider();
     private final JSlider offsetSlider = new JSlider(-5000, 5000, 0);
+    private final JTextField customSpeedField = new JTextField("1.0", 5);
     private final List<LineSlot> lineSlots = new ArrayList<>();
     private final Timer playbackTimer;
 
@@ -60,6 +63,7 @@ public final class SubtitleViewerApp {
     private boolean playing;
     private boolean scrubbing;
     private long lastTickMillis;
+    private double playbackSpeed = 1.0;
 
     public SubtitleViewerApp() {
         playbackTimer = new Timer(TIMER_DELAY_MS, event -> advancePlayback());
@@ -207,6 +211,34 @@ public final class SubtitleViewerApp {
         offsetLabel.setForeground(new Color(210, 210, 220));
         buttonRow.add(offsetLabel);
 
+        buttonRow.add(Box.createHorizontalStrut(12));
+
+        JLabel speedText = new JLabel("Playback speed");
+        speedText.setForeground(Color.WHITE);
+        buttonRow.add(speedText);
+
+        JButton normalSpeedButton = new JButton("1.0x");
+        normalSpeedButton.addActionListener(event -> setPlaybackSpeed(1.0));
+        buttonRow.add(normalSpeedButton);
+
+        JButton mediumSpeedButton = new JButton("0.8x");
+        mediumSpeedButton.addActionListener(event -> setPlaybackSpeed(0.8));
+        buttonRow.add(mediumSpeedButton);
+
+        JButton slowSpeedButton = new JButton("0.5x");
+        slowSpeedButton.addActionListener(event -> setPlaybackSpeed(0.5));
+        buttonRow.add(slowSpeedButton);
+
+        customSpeedField.addActionListener(event -> applyCustomSpeed());
+        buttonRow.add(customSpeedField);
+
+        JButton setSpeedButton = new JButton("Set");
+        setSpeedButton.addActionListener(event -> applyCustomSpeed());
+        buttonRow.add(setSpeedButton);
+
+        speedLabel.setForeground(new Color(210, 210, 220));
+        buttonRow.add(speedLabel);
+
         outer.add(infoPanel);
         outer.add(Box.createVerticalStrut(8));
         outer.add(timelineSlider);
@@ -294,7 +326,7 @@ public final class SubtitleViewerApp {
         long now = System.currentTimeMillis();
         double delta = (now - lastTickMillis) / 1000.0;
         lastTickMillis = now;
-        setPlaybackSeconds(playbackSeconds + delta, false);
+        setPlaybackSeconds(playbackSeconds + (delta * playbackSpeed), false);
 
         if (playbackSeconds >= totalSeconds) {
             pausePlayback();
@@ -328,6 +360,27 @@ public final class SubtitleViewerApp {
         }
 
         renderCurrentState();
+    }
+
+    private void setPlaybackSpeed(double newSpeed) {
+        playbackSpeed = Math.max(0.05, newSpeed);
+        customSpeedField.setText(trimSpeed(playbackSpeed));
+        speedLabel.setText("Speed: " + String.format("%.2fx", playbackSpeed));
+    }
+
+    private void applyCustomSpeed() {
+        try {
+            double parsed = Double.parseDouble(customSpeedField.getText().trim());
+            if (parsed <= 0.0) {
+                throw new NumberFormatException("Playback speed must be positive.");
+            }
+            setPlaybackSpeed(parsed);
+        } catch (NumberFormatException exception) {
+            JOptionPane.showMessageDialog(frame,
+                    "Playback speed must be a positive number like 0.8, 0.5, or 1.25.",
+                    "Invalid speed",
+                    JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     private void renderCurrentState() {
@@ -407,6 +460,17 @@ public final class SubtitleViewerApp {
 
     private static String safe(String value) {
         return value == null || value.isBlank() ? "-" : value;
+    }
+
+    private static String trimSpeed(double value) {
+        String formatted = String.format("%.2f", value);
+        if (formatted.endsWith("00")) {
+            return formatted.substring(0, formatted.length() - 1);
+        }
+        if (formatted.endsWith("0")) {
+            return formatted.substring(0, formatted.length() - 1);
+        }
+        return formatted;
     }
 
     private record LineSlot(JPanel panel, JLabel label, SubtitleLinePanel textPane) {
