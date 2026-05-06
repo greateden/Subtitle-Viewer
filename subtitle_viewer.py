@@ -198,8 +198,11 @@ class SubtitleViewerApp:
         self.current_time_var = tk.StringVar(value="00:00.00")
         self.active_sentence_var = tk.StringVar(value="No active subtitle")
         self.offset_var = tk.StringVar(value="Offset: 0 ms")
+        self.speed_var = tk.StringVar(value="Speed: 1.00x")
         self.timeline_var = tk.DoubleVar(value=0.0)
         self.offset_ms_var = tk.IntVar(value=0)
+        self.custom_speed_var = tk.StringVar(value="1.0")
+        self.playback_speed = 1.0
 
         self.line_views: list[SubtitleLineView] = []
         self._build_ui()
@@ -290,6 +293,20 @@ class SubtitleViewerApp:
 
         tk.Label(offset_controls, textvariable=self.offset_var, fg=TEXT_MUTED, bg=WINDOW_BG, font=("Segoe UI", 10)).pack(side="left")
 
+        speed_controls = tk.Frame(buttons, bg=WINDOW_BG)
+        speed_controls.pack(side="left", padx=(18, 0))
+        tk.Label(speed_controls, text="Playback speed", fg=TEXT_BASE, bg=WINDOW_BG, font=("Segoe UI", 10)).pack(side="left")
+        tk.Button(speed_controls, text="1.0x", command=lambda: self.set_playback_speed(1.0), padx=10, pady=4).pack(side="left", padx=(10, 0))
+        tk.Button(speed_controls, text="0.8x", command=lambda: self.set_playback_speed(0.8), padx=10, pady=4).pack(side="left", padx=(6, 0))
+        tk.Button(speed_controls, text="0.5x", command=lambda: self.set_playback_speed(0.5), padx=10, pady=4).pack(side="left", padx=(6, 0))
+
+        custom_speed_entry = tk.Entry(speed_controls, textvariable=self.custom_speed_var, width=6)
+        custom_speed_entry.pack(side="left", padx=(8, 0))
+        custom_speed_entry.bind("<Return>", lambda _event: self.apply_custom_speed())
+
+        tk.Button(speed_controls, text="Set", command=self.apply_custom_speed, padx=10, pady=4).pack(side="left", padx=(6, 0))
+        tk.Label(speed_controls, textvariable=self.speed_var, fg=TEXT_MUTED, bg=WINDOW_BG, font=("Segoe UI", 10)).pack(side="left", padx=(8, 0))
+
     def choose_file(self) -> None:
         initial_dir = self.current_file.parent if self.current_file else Path.cwd()
         selected = filedialog.askopenfilename(
@@ -362,6 +379,26 @@ class SubtitleViewerApp:
         self.offset_var.set(f"Offset: {int(float(raw_value))} ms")
         self.render_current_state()
 
+    def set_playback_speed(self, speed: float) -> None:
+        speed = max(0.05, speed)
+        self.playback_speed = speed
+        self.custom_speed_var.set(f"{speed:.2f}".rstrip("0").rstrip("."))
+        self.speed_var.set(f"Speed: {speed:.2f}x")
+
+    def apply_custom_speed(self) -> None:
+        raw = self.custom_speed_var.get().strip()
+        try:
+            speed = float(raw)
+        except ValueError:
+            messagebox.showerror("Invalid speed", "Playback speed must be a number like 0.8, 0.5, or 1.25.", parent=self.root)
+            return
+
+        if speed <= 0:
+            messagebox.showerror("Invalid speed", "Playback speed must be greater than 0.", parent=self.root)
+            return
+
+        self.set_playback_speed(speed)
+
     def set_playback_seconds(self, value: float, update_scale: bool = True) -> None:
         self.playback_seconds = max(0.0, min(value, self.total_seconds))
         if update_scale:
@@ -412,7 +449,7 @@ class SubtitleViewerApp:
             now = time.perf_counter()
             delta = now - self.last_tick
             self.last_tick = now
-            self.set_playback_seconds(self.playback_seconds + delta)
+            self.set_playback_seconds(self.playback_seconds + (delta * self.playback_speed))
             if self.playback_seconds >= self.total_seconds:
                 self.pause_playback()
         else:
